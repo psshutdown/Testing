@@ -1,19 +1,50 @@
-# Starter pipeline
-# Start with a minimal pipeline that you can customize to build and deploy your code.
-# Add steps that build, run tests, deploy, and more:
-# https://aka.ms/yaml
-
 trigger:
-- master
-
+  branches:
+    include:
+      - main
+variables:
+  tfWorkingDir: 'C:\\terraform\\ResourceGroup'
+  tfRg: 'your-backend-rg'
+  tfStorage: 'yourbackendstorage'
+  tfContainer: 'tfstate'
+  tfKey: 'terraform.tfstate'
+  azureServiceConnection: 'KamsSvcConnec'  # 👈 your service connection name
 pool:
-  vmImage: ubuntu-latest
-
-steps:
-- script: echo Hello, world!
-  displayName: 'Run a one-line script'
-
-- script: |
-    echo Add other tasks to build, test, and deploy your project.
-    echo See https://aka.ms/yaml
-  displayName: 'Run a multi-line script'
+  name: 'Default'
+stages:
+  - stage: Terraform
+    displayName: Deploy Terraform
+    jobs:
+      - job: RunTerraform
+        displayName: Terraform Init, Plan, Apply
+        steps:
+          - task: TerraformInstaller@1
+            inputs:
+              terraformVersion: 'latest'
+          - task: TerraformTaskV4@4
+            displayName: 'Terraform Init'
+            inputs:
+              provider: 'azurerm'
+              command: 'init'
+              backendServiceArm: '$(azureServiceConnection)'                 # ✅ Required for backend config
+              environmentServiceNameAzureRM: '$(azureServiceConnection)'    # ✅ Required for auth
+              workingDirectory: '$(tfWorkingDir)'
+              backendAzureRmResourceGroupName: '$(tfRg)'
+              backendAzureRmStorageAccountName: '$(tfStorage)'
+              backendAzureRmContainerName: '$(tfContainer)'
+              backendAzureRmKey: '$(tfKey)'
+          - task: TerraformTaskV4@4
+            displayName: 'Terraform Plan'
+            inputs:
+              provider: 'azurerm'
+              command: 'plan'
+              environmentServiceNameAzureRM: '$(azureServiceConnection)'
+              workingDirectory: '$(tfWorkingDir)'
+          - task: TerraformTaskV4@4
+            displayName: 'Terraform Apply'
+            inputs:
+              provider: 'azurerm'
+              command: 'apply'
+              environmentServiceNameAzureRM: '$(azureServiceConnection)'
+              workingDirectory: '$(tfWorkingDir)'
+              commandOptions: '-auto-approve'
